@@ -1,115 +1,202 @@
-// --- HTML要素を取得 ---
-const taskInput = document.getElementById('task-input');
-const addButton = document.getElementById('add-button');
-const taskList = document.getElementById('task-list');
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM要素の取得 ---
+    const taskInput = document.getElementById('task-input');
+    const addButton = document.getElementById('add-button');
+    const taskList = document.getElementById('task-list');
+    const progressBar = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
 
-// --- イベントリスナーの設定 ---
-// DOMContentLoaded: HTMLの読み込みと解析が終わった時点で実行
-document.addEventListener('DOMContentLoaded', loadTasks);
-addButton.addEventListener('click', addTask);
-taskList.addEventListener('click', handleTaskClick);
-taskInput.addEventListener('keydown', function(event) {
-    if (event.isComposing || event.key !== 'Enter') {
-        return;
-    }
-    addTask();
-});
+    // --- アプリケーションの状態 ---
+    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
 
-// --- 関数定義 ---
+    // --- イベントリスナーの設定 ---
+    addButton.addEventListener('click', addTask);
+    taskInput.addEventListener('keydown', (e) => {
+        if (e.isComposing || e.key !== 'Enter') return;
+        addTask();
+    });
 
-/**
- * タスクを追加する関数
- */
-function addTask() {
-    const taskText = taskInput.value.trim();
-    if (taskText === '') {
-        return;
-    }
+    // タスクリスト全体のイベントを監視（イベント委任）
+    taskList.addEventListener('click', handleTaskAction);
 
-    createTaskElement(taskText, false); // 新しいタスク要素を作成
-    taskInput.value = ''; // 入力欄をクリア
-    saveTasks(); // 変更を保存
-}
+    // --- 初期化処理 ---
+    renderTasks();
 
-/**
- * タスクの完了状態を切り替える、またはタスクを削除する関数
- * @param {MouseEvent} event - クリックイベントの情報
- */
-function handleTaskClick(event) {
-    const clickedElement = event.target;
+    // --- 関数定義 ---
 
-    if (clickedElement.classList.contains('delete-button')) {
-        const listItem = clickedElement.parentElement;
-        listItem.remove();
-    } else if (clickedElement.tagName === 'SPAN') {
-        const listItem = clickedElement.parentElement;
-        listItem.classList.toggle('completed');
-    }
+    /**
+     * 新しいタスクを追加する
+     */
+    function addTask() {
+        const text = taskInput.value.trim();
+        if (text === '') {
+            alert('タスクを入力してください。');
+            return;
+        }
 
-    saveTasks(); // 変更を保存
-}
-
-/**
- * 現在のタスクリストをローカルストレージに保存する関数
- */
-function saveTasks() {
-    const tasks = [];
-    // taskList内のすべてのli要素を取得
-    const listItems = taskList.querySelectorAll('li');
-
-    // 各li要素からタスク情報（テキストと完了状態）をオブジェクトとして抽出し、配列に追加
-    listItems.forEach(item => {
-        const taskSpan = item.querySelector('span');
         tasks.push({
-            text: taskSpan.textContent,
-            completed: item.classList.contains('completed')
+            id: Date.now(),
+            text: text,
+            status: 'todo', // 'todo', 'in-progress', 'completed'
+            completedAt: null
         });
-    });
 
-    // タスクの配列をJSON文字列に変換して、'tasks'というキーでローカルストレージに保存
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-}
-
-/**
- * ローカルストレージからタスクを読み込んで表示する関数
- */
-function loadTasks() {
-    // 'tasks'というキーで保存されたJSON文字列を取得
-    const savedTasks = localStorage.getItem('tasks');
-
-    // データがなければ何もしない
-    if (!savedTasks) {
-        return;
+        taskInput.value = '';
+        saveAndRender();
     }
 
-    // JSON文字列をJavaScriptの配列に変換
-    const tasks = JSON.parse(savedTasks);
+    /**
+     * タスクリストでのアクションを処理する
+     * @param {Event} e - クリックイベント
+     */
+    function handleTaskAction(e) {
+        const target = e.target;
+        const parentLi = target.closest('li');
+        if (!parentLi) return;
 
-    // 配列内の各タスク情報をもとに、画面にタスク要素を作成して表示
-    tasks.forEach(task => {
-        createTaskElement(task.text, task.completed);
-    });
-}
+        const taskId = Number(parentLi.dataset.id);
 
-/**
- * 新しいタスクのHTML要素を作成してリストに追加する関数
- * @param {string} text - タスクのテキスト
- * @param {boolean} isCompleted - タスクが完了しているかどうか
- */
-function createTaskElement(text, isCompleted) {
-    const listItem = document.createElement('li');
-    if (isCompleted) {
-        listItem.classList.add('completed');
+        // 削除ボタンが押された場合
+        if (target.classList.contains('delete-button')) {
+            deleteTask(taskId);
+            return;
+        }
+
+        // 編集ボタンが押された場合
+        if (target.classList.contains('edit-button')) {
+            editTask(taskId, parentLi);
+            return;
+        }
+
+        // 上記以外（タスク自体）がクリックされた場合、ステータスを切り替える
+        cycleTaskStatus(taskId);
     }
 
-    const taskSpan = document.createElement('span');
-    taskSpan.textContent = text;
+    /**
+     * タスクを編集する
+     * @param {number} id - タスクID
+     */
+    function editTask(id) {
+        const task = tasks.find(t => t.id === id);
+        const newText = prompt('タスクを編集してください:', task.text);
 
-    const deleteButton = document.createElement('button');
-    deleteButton.textContent = '削除';
-    deleteButton.className = 'delete-button';
+        if (newText !== null && newText.trim() !== '') {
+            task.text = newText.trim();
+            saveAndRender();
+        }
+    }
 
-    listItem.appendChild(taskSpan);
-    listItem.appendChild(deleteButton);
-    taskList.appendChild(listItem);
-}
+    /**
+     * タスクを削除する
+     * @param {number} id - タスクID
+     */
+    function deleteTask(id) {
+        if (confirm('本当にこのタスクを削除しますか？')) {
+            tasks = tasks.filter(t => t.id !== id);
+            saveAndRender();
+        }
+    }
+
+    /**
+     * タスクのステータスを循環させる
+     * @param {number} id - タスクID
+     */
+    function cycleTaskStatus(id) {
+        const task = tasks.find(t => t.id === id);
+        switch (task.status) {
+            case 'todo':
+                task.status = 'in-progress';
+                break;
+            case 'in-progress':
+                task.status = 'completed';
+                task.completedAt = new Date();
+                break;
+            case 'completed':
+                task.status = 'todo';
+                task.completedAt = null;
+                break;
+        }
+        saveAndRender();
+    }
+
+    /**
+     * 変更を保存して再描画する
+     */
+    function saveAndRender() {
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        renderTasks();
+    }
+
+    /**
+     * タスクリストと進捗バーを再描画する
+     */
+    function renderTasks() {
+        taskList.innerHTML = ''; // リストをクリア
+
+        if (tasks.length === 0) {
+            updateProgressBar();
+            return;
+        }
+
+        tasks.forEach(task => {
+            const li = document.createElement('li');
+            li.dataset.id = task.id;
+            li.className = task.status; // 'todo', 'in-progress', 'completed'
+
+            const taskText = document.createElement('span');
+            taskText.className = 'task-text';
+            taskText.textContent = task.text;
+
+            const statusContainer = document.createElement('div');
+            statusContainer.className = 'status-container';
+
+            // ステータスラベルの追加
+            if (task.status === 'in-progress') {
+                const statusLabel = document.createElement('span');
+                statusLabel.className = 'status-label in-progress-label';
+                statusLabel.textContent = '＜今ここ';
+                statusContainer.appendChild(statusLabel);
+            } else if (task.status === 'completed') {
+                const completedDate = document.createElement('span');
+                completedDate.className = 'completed-date';
+                const d = new Date(task.completedAt);
+                completedDate.textContent = `${d.getMonth() + 1}/${d.getDate()}済み`;
+                statusContainer.appendChild(completedDate);
+            }
+
+            // ボタンコンテナの追加
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'button-container';
+
+            const editButton = document.createElement('button');
+            editButton.className = 'edit-button';
+            editButton.textContent = '編集';
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button';
+            deleteButton.textContent = '削除';
+
+            buttonContainer.appendChild(editButton);
+            buttonContainer.appendChild(deleteButton);
+
+            li.appendChild(taskText);
+            li.appendChild(statusContainer);
+            li.appendChild(buttonContainer);
+            taskList.appendChild(li);
+        });
+
+        updateProgressBar();
+    }
+
+    /**
+     * 進捗バーを更新する
+     */
+    function updateProgressBar() {
+        const completedTasks = tasks.filter(t => t.status === 'completed').length;
+        const totalTasks = tasks.length;
+        const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+        progressBar.style.width = `${progress}%`;
+        progressLabel.textContent = `進捗: ${Math.round(progress)}%`;
+    }
+});

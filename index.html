@@ -9,13 +9,25 @@
 <body>
 
     <div id="app">
-        <h1>わたしのTODOリスト</h1>
+        <h1>作業進捗ボード</h1>
+
+        <!-- 進捗表示エリア -->
+        <div id="progress-container">
+            <div id="progress-bar-container">
+                <div id="progress-bar"></div>
+            </div>
+            <span id="progress-label">進捗: 0%</span>
+        </div>
+
+        <!-- タスク入力エリア -->
         <div class="input-container">
-            <input type="text" id="task-input" placeholder="新しいタスクを入力...">
+            <input type="text" id="task-input" placeholder="新しいタスクを追加...">
             <button id="add-button">追加</button>
         </div>
+
+        <!-- タスクリスト -->
         <ul id="task-list">
-            <!-- ここにタスクが追加されます -->
+            <!-- ここにタスクが表示されます -->
         </ul>
     </div>
 
