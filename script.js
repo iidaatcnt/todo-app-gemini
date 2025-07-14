@@ -1,8 +1,19 @@
 // --- HTML要素を取得 ---
-// document.getElementById('ID名') で、HTMLから特定のIDを持つ要素を探してきます。
-const taskInput = document.getElementById('task-input'); // タスク入力欄
-const addButton = document.getElementById('add-button'); // 追加ボタン
-const taskList = document.getElementById('task-list');   // タスクリスト
+const taskInput = document.getElementById('task-input');
+const addButton = document.getElementById('add-button');
+const taskList = document.getElementById('task-list');
+
+// --- イベントリスナーの設定 ---
+// DOMContentLoaded: HTMLの読み込みと解析が終わった時点で実行
+document.addEventListener('DOMContentLoaded', loadTasks);
+addButton.addEventListener('click', addTask);
+taskList.addEventListener('click', handleTaskClick);
+taskInput.addEventListener('keydown', function(event) {
+    if (event.isComposing || event.key !== 'Enter') {
+        return;
+    }
+    addTask();
+});
 
 // --- 関数定義 ---
 
@@ -10,37 +21,14 @@ const taskList = document.getElementById('task-list');   // タスクリスト
  * タスクを追加する関数
  */
 function addTask() {
-    // 入力欄のテキストを取得し、前後の余白を削除します。
     const taskText = taskInput.value.trim();
-
-    // 入力欄が空っぽの場合は、何もせずに処理を終了します。
     if (taskText === '') {
-        return; // returnで関数を抜ける
+        return;
     }
 
-    // --- ここから、新しいタスク要素を組み立てます ---
-
-    // 1. <li>要素（リストの1行）を作成
-    const listItem = document.createElement('li');
-
-    // 2. タスクのテキストを表示する<span>要素を作成
-    const taskSpan = document.createElement('span');
-    taskSpan.textContent = taskText; // <span>の中に、入力されたテキストを入れる
-
-    // 3. 削除ボタンを作成
-    const deleteButton = document.createElement('button');
-    deleteButton.textContent = '削除'; // ボタンの文字
-    deleteButton.className = 'delete-button'; // CSSでデザインを当てるためのクラス名
-
-    // 4. <li>要素に、テキスト(<span>)と削除ボタンを追加
-    listItem.appendChild(taskSpan);
-    listItem.appendChild(deleteButton);
-
-    // --- 組み立てたタスク要素を、画面のリストに追加します ---
-    taskList.appendChild(listItem);
-
-    // 最後に、入力欄を空にして、次のタスクを入力しやすくします。
-    taskInput.value = '';
+    createTaskElement(taskText, false); // 新しいタスク要素を作成
+    taskInput.value = ''; // 入力欄をクリア
+    saveTasks(); // 変更を保存
 }
 
 /**
@@ -48,40 +36,80 @@ function addTask() {
  * @param {MouseEvent} event - クリックイベントの情報
  */
 function handleTaskClick(event) {
-    // event.target には、クリックされた要素そのものが入っています。
     const clickedElement = event.target;
 
-    // クリックされたのが「削除ボタン」の場合
     if (clickedElement.classList.contains('delete-button')) {
-        // ボタンの親要素である<li>をリストから削除します。
         const listItem = clickedElement.parentElement;
         listItem.remove();
-    }
-    // クリックされたのがタスクの文字（<span>）の場合
-    else if (clickedElement.tagName === 'SPAN') {
-        // その親要素である<li>に 'completed' クラスを付けたり外したりします。
-        // classList.toggle() は、クラスがあれば外し、なければ付ける、という便利な命令です。
+    } else if (clickedElement.tagName === 'SPAN') {
         const listItem = clickedElement.parentElement;
         listItem.classList.toggle('completed');
     }
+
+    saveTasks(); // 変更を保存
 }
 
-// --- イベントリスナーの設定 ---
-// これで、ボタンやリストがユーザーの操作に反応するようになります。
+/**
+ * 現在のタスクリストをローカルストレージに保存する関数
+ */
+function saveTasks() {
+    const tasks = [];
+    // taskList内のすべてのli要素を取得
+    const listItems = taskList.querySelectorAll('li');
 
-// 「追加」ボタンがクリックされたら、addTask関数を実行します。
-addButton.addEventListener('click', addTask);
+    // 各li要素からタスク情報（テキストと完了状態）をオブジェクトとして抽出し、配列に追加
+    listItems.forEach(item => {
+        const taskSpan = item.querySelector('span');
+        tasks.push({
+            text: taskSpan.textContent,
+            completed: item.classList.contains('completed')
+        });
+    });
 
-// タスクリスト（<ul>）でクリックイベントが発生したら、handleTaskClick関数を実行します。
-// これを「イベント委任」と呼び、後から追加したタスクにも反応できる効率的な方法です。
-taskList.addEventListener('click', handleTaskClick);
+    // タスクの配列をJSON文字列に変換して、'tasks'というキーでローカルストレージに保存
+    localStorage.setItem('tasks', JSON.stringify(tasks));
+}
 
-// 入力欄でキーが押された時に反応します。
-taskInput.addEventListener('keydown', function(event) {
-    // IMEが変換中でなく、押されたキーが「Enter」キーの場合
-    if (event.isComposing || event.key !== 'Enter') {
+/**
+ * ローカルストレージからタスクを読み込んで表示する関数
+ */
+function loadTasks() {
+    // 'tasks'というキーで保存されたJSON文字列を取得
+    const savedTasks = localStorage.getItem('tasks');
+
+    // データがなければ何もしない
+    if (!savedTasks) {
         return;
     }
-    // addTask関数を実行します。
-    addTask();
-});
+
+    // JSON文字列をJavaScriptの配列に変換
+    const tasks = JSON.parse(savedTasks);
+
+    // 配列内の各タスク情報をもとに、画面にタスク要素を作成して表示
+    tasks.forEach(task => {
+        createTaskElement(task.text, task.completed);
+    });
+}
+
+/**
+ * 新しいタスクのHTML要素を作成してリストに追加する関数
+ * @param {string} text - タスクのテキスト
+ * @param {boolean} isCompleted - タスクが完了しているかどうか
+ */
+function createTaskElement(text, isCompleted) {
+    const listItem = document.createElement('li');
+    if (isCompleted) {
+        listItem.classList.add('completed');
+    }
+
+    const taskSpan = document.createElement('span');
+    taskSpan.textContent = text;
+
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = '削除';
+    deleteButton.className = 'delete-button';
+
+    listItem.appendChild(taskSpan);
+    listItem.appendChild(deleteButton);
+    taskList.appendChild(listItem);
+}
