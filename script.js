@@ -7,7 +7,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressLabel = document.getElementById('progress-label');
 
     // --- アプリケーションの状態 ---
-    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    let tasks = JSON.parse(localStorage.getItem('tasks'));
+
+    // ローカルストレージが空、またはタスクが0件の場合に初期リストを設定
+    if (!tasks || tasks.length === 0) {
+        tasks = [
+            { id: Date.now() + 1, text: 'ステップ01. 要件確認', status: 'todo', completedAt: null },
+            { id: Date.now() + 2, text: 'ステップ02. 作業に必要な情報受領', status: 'todo', completedAt: null },
+            { id: Date.now() + 3, text: 'ステップ03. サーバーの状態を確認', status: 'todo', completedAt: null },
+            { id: Date.now() + 4, text: 'ステップ04. 作業前のデータ全バックアップ', status: 'todo', completedAt: null },
+            { id: Date.now() + 5, text: 'ステップ05. 開発環境の構築（仮ドメイン）', status: 'todo', completedAt: null },
+            { id: Date.now() + 6, text: 'ステップ06. 本番環境のメール設定', status: 'todo', completedAt: null },
+            { id: Date.now() + 7, text: 'ステップ07. 本番環境の構築（メンテナンス画面）', status: 'todo', completedAt: null },
+            { id: Date.now() + 8, text: 'ステップ08. 本番環境のメンテナンス画面解除', status: 'todo', completedAt: null },
+            { id: Date.now() + 9, text: 'ステップ09. 依頼者様の検収', status: 'todo', completedAt: null }
+        ];
+    }
 
     // --- イベントリスナーの設定 ---
     addButton.addEventListener('click', addTask);
